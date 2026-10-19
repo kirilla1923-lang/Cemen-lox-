@@ -1,0 +1,232 @@
+-- Семён Lox | ULTIMATE SAFE FARM (Final)
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local Window = Rayfield:CreateWindow({
+    Name = "Семён Lоx",
+    LoadingTitle = "Загрузка...",
+    LoadingSubtitle = "Safe Fly Farm",
+    ConfigurationSaving = {Enabled = false},
+    KeySystem = false
+})
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local LP = Players.LocalPlayer
+local HRP = nil
+local farming = false
+local flySpeed = 40 
+local isMoving = false
+
+-- 1. НАДПИСЬ И 10 ФЛАГОВ
+local GUI_NAME = "SemenLoxGui"
+local function buildUI()
+    local pg = LP:FindFirstChild("PlayerGui") or LP:WaitForChild("PlayerGui")
+    local gui = pg:FindFirstChild(GUI_NAME)
+    if not gui then
+        gui = Instance.new("ScreenGui")
+        gui.Name = GUI_NAME
+        gui.ResetOnSpawn = false
+        gui.DisplayOrder = 2147483647
+        gui.Parent = pg
+    end
+    if not gui:FindFirstChild("Flags") then
+        local fFolder = Instance.new("Folder", gui)
+        fFolder.Name = "Flags"
+        local colors = {Color3.fromRGB(40,75,60),Color3.fromRGB(65,150,125),Color3.fromRGB(140,200,180),Color3.fromRGB(220,220,230),Color3.fromRGB(100,130,200),Color3.fromRGB(60,50,160),Color3.fromRGB(35,20,85)}
+        local placed = {}
+        for i = 1, 10 do
+            local f = Instance.new("Frame", fFolder)
+            f.BackgroundTransparency = 1
+            local w, h, x, y
+            for _ = 1, 30 do
+                w, h = math.random(10,20)/100, math.random(15,25)/100
+                x, y = math.random(5,85)/100, math.random(5,80)/100
+                local overlap = false
+                for _, v in ipairs(placed) do
+                    if x < v.x+v.w and x+w > v.x and y < v.y+v.h and y+h > v.y then overlap = true break end
+                end
+                if not overlap then break end
+            end
+            f.Size, f.Position = UDim2.new(w,0,h,0), UDim2.new(x,0,y,0)
+            table.insert(placed, {x=x, y=y, w=w, h=h})
+            for j = 1, 7 do
+                local b = Instance.new("Frame", f)
+                b.Size = UDim2.new(1,0,1/7,0)
+                b.Position = UDim2.new(0,0,(j-1)/7,0)
+                b.BackgroundColor3 = colors[j]
+                b.BorderSizePixel = 0
+            end
+        end
+    end
+    local label = gui:FindFirstChild("SemenLoxLabel")
+    if not label then
+        label = Instance.new("TextLabel", gui)
+        label.Name = "SemenLoxLabel"
+        label.Size = UDim2.new(3,0,3,0)
+        label.Position = UDim2.new(0.5,0,0.5,0)
+        label.AnchorPoint = Vector2.new(0.5,0.5)
+        label.BackgroundTransparency = 1
+        label.Text = "Семён лох"
+        label.TextColor3 = Color3.new(1,1,1)
+        label.TextStrokeTransparency = 0
+        label.Font = Enum.Font.IndieFlower
+        label.TextScaled = true
+        label.ZIndex = 2147483647
+        Instance.new("UIGradient", label)
+    end
+end
+buildUI()
+
+task.spawn(function()
+    local hue = 0
+    while true do
+        local dt = RunService.RenderStepped:Wait()
+        hue = (hue + dt * 0.2) % 1
+        local gui = LP.PlayerGui:FindFirstChild(GUI_NAME)
+        local label = gui and gui:FindFirstChild("SemenLoxLabel")
+        if label then
+            local grad = label:FindFirstChildOfClass("UIGradient")
+            if grad then
+                local c = {}
+                for i = 0, 6 do table.insert(c, ColorSequenceKeypoint.new(i/6, Color3.fromHSV((hue+i/6)%1, 1, 1))) end
+                grad.Color = ColorSequence.new(c)
+                grad.Rotation = (hue * 360) % 360
+            end
+        end
+    end
+end)
+
+-- 2. ФАРМ
+local function updateHRP() if LP.Character then HRP = LP.Character:FindFirstChild("HumanoidRootPart") end end
+LP.CharacterAdded:Connect(function() task.wait(0.5) updateHRP() end)
+updateHRP()
+
+local function safeFlyTo(targetPos)
+    if not HRP or isMoving then return end
+    isMoving = true
+    local distance = (HRP.Position - targetPos).Magnitude
+    local travelTime = math.clamp(distance / flySpeed, 0.2, 4.0)
+    local tween = TweenService:Create(HRP, TweenInfo.new(travelTime, Enum.EasingStyle.Linear), {CFrame = CFrame.new(targetPos + Vector3.new(0, 2, 0))})
+    tween:Play()
+    tween.Completed:Wait()
+    task.wait(0.4)
+    isMoving = false
+end
+
+local function collectItem(obj)
+    if not obj or not obj.Parent then return end
+    if firetouchinterest and HRP then
+        if obj:IsA("BasePart") then
+            pcall(function() firetouchinterest(HRP, obj, 0) task.wait(0.01) firetouchinterest(HRP, obj, 1) end)
+        elseif obj:IsA("Model") then
+            for _, p in ipairs(obj:GetDescendants()) do
+                if p:IsA("BasePart") then pcall(function() firetouchinterest(HRP, p, 0) task.wait(0.01) firetouchinterest(HRP, p, 1) end) end
+            end
+        end
+    end
+    local pp = obj:FindFirstChildOfClass("ProximityPrompt") or (obj:IsA("Model") and obj:FindFirstChildOfClass("ProximityPrompt", true))
+    if pp then pcall(function() fireproximityprompt(pp) end) end
+    local cd = obj:FindFirstChildOfClass("ClickDetector") or (obj:IsA("Model") and obj:FindFirstChildOfClass("ClickDetector", true))
+    if cd and fireclickdetector then pcall(fireclickdetector, cd) end
+    for _, d in ipairs(obj:GetDescendants()) do
+        if d:IsA("RemoteEvent") then pcall(function() d:FireServer() end) end
+        if d:IsA("RemoteFunction") then pcall(function() d:InvokeServer() end) end
+    end
+end
+
+local function getPos(obj)
+    if obj:IsA("BasePart") then return obj.Position end
+    if obj:IsA("Model") then
+        local p = obj:FindFirstChildWhichIsA("BasePart", true)
+        if p then return p.Position end
+        local ok, cf = pcall(function() return obj:GetPivot().Position end)
+        if ok then return cf end
+    end
+    return nil
+end
+
+workspace.DescendantAdded:Connect(function(obj)
+    if not farming or not HRP or isMoving then return end
+    if obj:IsA("BasePart") or obj:IsA("Model") then
+        local pos = getPos(obj)
+        if pos and not obj:FindFirstAncestorOfClass("Model") and obj.Name ~= "Baseplate" and obj.Name ~= "HumanoidRootPart" then
+            local dist = (HRP.Position - pos).Magnitude
+            if dist < 150 then
+                task.spawn(function()
+                    safeFlyTo(pos)
+                    collectItem(obj)
+                end)
+            end
+        end
+    end
+end)
+
+local function vacuumLoop()
+    while farming do
+        updateHRP()
+        if HRP and not isMoving then
+            for _, v in ipairs(workspace:GetDescendants()) do
+                local n = v.Name:lower()
+                if n:find("candy") or n:find("sweet") or n:find("treat") or n:find("coin") or n:find("money") then
+                    local pos = getPos(v)
+                    if pos and (HRP.Position - pos).Magnitude < 150 then
+                        task.spawn(function()
+                            safeFlyTo(pos)
+                            collectItem(v)
+                        end)
+                        break
+                    end
+                end
+            end
+        end
+        task.wait(1)
+    end
+end
+
+-- 3. МЕНЮ
+local Tab = Window:CreateTab("Фарм", 4483362458)
+Tab:CreateSection("Управление")
+
+Tab:CreateButton({
+    Name = "▶ ВКЛЮЧИТЬ БЕЗОПАСНЫЙ ФАРМ",
+    Callback = function()
+        if not farming then
+            farming = true
+            updateHRP()
+            task.spawn(vacuumLoop)
+            Rayfield:Notify({Title="Семён Lоx", Content="Фарм включен. Плавный полет, чтобы не кикало.", Duration=5})
+        end
+    end,
+})
+
+Tab:CreateButton({
+    Name = "⏹ ОСТАНОВИТЬ",
+    Callback = function()
+        farming = false
+        Rayfield:Notify({Title="Семён Lоx", Content="Стоп.", Duration=3})
+    end,
+})
+
+Tab:CreateSlider({
+    Name = "Скорость полета (меньше = безопаснее)",
+    Range = {10, 100}, Increment = 5, Suffix = " studs/s",
+    CurrentValue = 40, Flag = "Speed",
+    Callback = function(v) flySpeed = v end,
+})
+
+Tab:CreateButton({
+    Name = "👁 ВКЛЮЧИТЬ ESP (Подсветка предметов)",
+    Callback = function()
+        for _, v in ipairs(workspace:GetDescendants()) do
+            if v:IsA("BasePart") then
+                local n = v.Name:lower()
+                if n:find("candy") or n:find("sweet") or n:find("treat") or n:find("coin") or n:find("money") then
+                    local hl = Instance.new("Highlight", v)
+                    hl.FillColor = Color3.new(1, 0, 1)
+                    hl.OutlineColor = Color3.new(1, 1, 0)
+                end
+            end
+        end
+        Rayfield:Notify({Title="Семён Lоx", Content="ESP включено.", Duration=3})
+    end,
+})
